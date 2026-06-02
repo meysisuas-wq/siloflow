@@ -1,0 +1,41 @@
+version: '3.9'
+services:
+  api:
+    build: .
+    container_name: siloflow-api
+    ports: ["8001:8001"]
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://siloflow:siloflow@timescale:5432/siloflow
+      REDIS_URL: redis://redis:6379/1
+    depends_on:
+      timescale: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    restart: unless-stopped
+
+  timescale:
+    image: timescale/timescaledb:latest-pg15
+    container_name: siloflow-db
+    environment: {POSTGRES_DB: siloflow, POSTGRES_USER: siloflow, POSTGRES_PASSWORD: siloflow}
+    ports: ["5433:5432"]
+    volumes: [timescale_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U siloflow -d siloflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: siloflow-cache
+    ports: ["6380:6379"]
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  timescale_data:
+  redis_data:
